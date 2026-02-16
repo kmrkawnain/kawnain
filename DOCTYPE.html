@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Ultra Modi Bird Game</title>
+<style>
+body { margin: 0; overflow: hidden; background: linear-gradient(#87CEEB, #ffffff); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+#game { position: relative; width: 100vw; height: 100vh; cursor: pointer; }
+
+/* 📸 Bird Image Setup */
+.bird { 
+  width: 65px; 
+  height: 65px; 
+  background-image: url('https://globalwiki.org/images/3/3e/Narendra-Modi.jpeg');
+  background-size: cover;
+  background-position: center;
+  border-radius: 50%; 
+  border: 3px solid #ff9933; /* Saffron border */
+  position: absolute; 
+  left: 100px; 
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  z-index: 5;
+}
+
+.pipe { width: 60px; background: #138808; position: absolute; border: 2px solid #fff; border-radius: 5px; }
+.info { position: absolute; top: 15px; left: 15px; font-size: 22px; font-weight: bold; z-index: 10; color: #333; text-shadow: 1px 1px white; }
+.game-over { position: absolute; top: 35%; width: 100%; text-align: center; font-size: 50px; display: none; z-index: 20; color: #d32f2f; font-weight: 900; }
+button { padding: 15px 35px; font-size: 20px; cursor: pointer; background: #ff9933; color: white; border: none; border-radius: 50px; font-weight: bold; box-shadow: 0 4px #e67e22; }
+button:active { box-shadow: 0 2px #e67e22; transform: translateY(2px); }
+#start-msg { position: absolute; top: 50%; width: 100%; text-align: center; font-size: 26px; color: #1e3799; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="game" onclick="handleInput()">
+  <div class="info">
+    Score: <span id="score">0</span> | Lives: <span id="lives">3</span> | Level: <span id="level">1</span>
+  </div>
+
+  <div id="start-msg">Tap to Fly & Play Remix Song! 🎵</div>
+  <div class="bird" id="bird" style="top: 250px;"></div>
+
+  <div class="game-over" id="gameOver">
+    GAME OVER <br><br>
+    <button onclick="resetGameValues()">Restart Mission</button>
+  </div>
+
+  <audio id="bgMusic" loop>
+    <source src="song.mp3" type="audio/mpeg">
+  </audio>
+</div>
+
+<script>
+let bird = document.getElementById("bird");
+let scoreEl = document.getElementById("score");
+let livesEl = document.getElementById("lives");
+let levelEl = document.getElementById("level");
+let gameOverEl = document.getElementById("gameOver");
+let bgMusic = document.getElementById("bgMusic");
+let game = document.getElementById("game");
+let startMsg = document.getElementById("start-msg");
+
+let birdY, velocity, score, lives, level, speed, pipes, gameRunning, musicStarted;
+let gravity = 0.45;
+let lift = -8.5;
+let pipeInterval;
+
+function init() {
+  birdY = 250;
+  velocity = 0;
+  score = 0;
+  lives = 3;
+  level = 1;
+  speed = 4;
+  pipes = [];
+  gameRunning = false;
+  musicStarted = false;
+  
+  scoreEl.textContent = score;
+  livesEl.textContent = lives;
+  levelEl.textContent = level;
+  bird.style.top = birdY + "px";
+}
+
+function startGame() {
+  if (gameRunning) return;
+  gameRunning = true;
+  startMsg.style.display = "none";
+  gameOverEl.style.display = "none";
+  
+  // Audio start logic
+  if (!musicStarted) {
+    bgMusic.currentTime = 0; // Start from beginning
+    bgMusic.play().catch(e => console.log("Music needs interaction"));
+    musicStarted = true;
+  }
+
+  if (pipeInterval) clearInterval(pipeInterval);
+  pipeInterval = setInterval(createPipe, 1700);
+  requestAnimationFrame(gameLoop);
+}
+
+function createPipe() {
+  if(!gameRunning) return;
+  let pipeTopHeight = Math.random() * 280 + 50;
+  let gap = 190;
+
+  let topPipe = document.createElement("div");
+  topPipe.classList.add("pipe");
+  topPipe.style.height = pipeTopHeight + "px";
+  topPipe.style.top = "0px";
+  topPipe.style.left = window.innerWidth + "px";
+
+  let bottomPipe = document.createElement("div");
+  bottomPipe.classList.add("pipe");
+  bottomPipe.style.height = (window.innerHeight - pipeTopHeight - gap) + "px";
+  bottomPipe.style.bottom = "0px";
+  bottomPipe.style.left = window.innerWidth + "px";
+
+  game.appendChild(topPipe);
+  game.appendChild(bottomPipe);
+  pipes.push({top: topPipe, bottom: bottomPipe});
+}
+
+function gameLoop() {
+  if(!gameRunning) return;
+
+  velocity += gravity;
+  birdY += velocity;
+  bird.style.top = birdY + "px";
+
+  for (let i = pipes.length - 1; i >= 0; i--) {
+    let p = pipes[i];
+    let left = p.top.offsetLeft - speed;
+    p.top.style.left = left + "px";
+    p.bottom.style.left = left + "px";
+
+    // Precise Collision Detection for the circular image
+    if (bird.offsetLeft + 55 > left && bird.offsetLeft < left + 60 &&
+       (birdY < p.top.offsetHeight || birdY + 55 > window.innerHeight - p.bottom.offsetHeight)) {
+      lives--;
+      livesEl.textContent = lives;
+      p.top.remove(); p.bottom.remove();
+      pipes.splice(i, 1);
+      if (lives <= 0) endGame();
+      continue;
+    }
+
+    if (left < -60) {
+      p.top.remove(); p.bottom.remove();
+      pipes.splice(i, 1);
+      score++;
+      scoreEl.textContent = score;
+      if(score % 5 === 0) { 
+        level++; 
+        levelEl.textContent = level; 
+        speed += 0.6; 
+      }
+    }
+  }
+
+  if (birdY > window.innerHeight || birdY < 0) endGame();
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  gameRunning = false;
+  clearInterval(pipeInterval);
+  gameOverEl.style.display = "block";
+  // Music continues to play "Pehla Nasha" even on game over!
+}
+
+function resetGameValues() {
+  document.querySelectorAll('.pipe').forEach(p => p.remove());
+  init();
+  startGame();
+}
+
+function handleInput() {
+  if (!gameRunning && lives > 0) startGame();
+  if (gameRunning) {
+    velocity = lift;
+    if (!musicStarted) { bgMusic.play(); musicStarted = true; }
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" || e.code === "ArrowUp") handleInput();
+});
+
+init();
+</script>
+</body>
+</html>
